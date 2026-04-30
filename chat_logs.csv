@@ -1,0 +1,11 @@
+participant_id,condition,timestamp_utc,role,message
+123,Warm,2026-04-30T04:13:46.573104+00:00,user,Hi.
+123,Warm,2026-04-30T04:13:46.573104+00:00,assistant,"Hi there! How are you doing today? If you’re feeling stressed with classes or deadlines, I’m here to help. Let’s chat about what’s on your mind!"
+123,Warm,2026-04-30T04:14:03.963537+00:00,user,I am stressed.
+123,Warm,2026-04-30T04:14:03.967823+00:00,assistant,"I’m sorry to hear that. It’s completely normal to feel stressed, especially with everything going on. Would you like to share what’s been weighing on you? Sometimes talking it out can help."
+123,Warm,2026-04-30T04:14:27.000062+00:00,user,Too many assignments.
+123,Warm,2026-04-30T04:14:27.003191+00:00,assistant,That sounds overwhelming! It can be tough to juggle multiple assignments. Have you thought about breaking them down into smaller tasks? Sometimes making a to-do list can help you feel more organized. What’s the most pressing assignment for you right now?
+123,Warm,2026-04-30T04:14:46.252716+00:00,user,My dissertation proposal.
+123,Warm,2026-04-30T04:14:46.252716+00:00,assistant,That’s a big task! Focusing on your dissertation proposal can feel daunting. Have you outlined your main ideas or sections yet? Breaking it down into steps might make it feel more manageable. I’m here to help you brainstorm if you’d like!
+123,Warm,2026-04-30T04:15:15.502920+00:00,user,I am interested to work on synthetic relationships.
+123,Warm,2026-04-30T04:15:15.502920+00:00,assistant,That sounds fascinating! Synthetic relationships can lead to some innovative insights. What specific aspect are you considering exploring in your proposal? Narrowing it down might help clarify your direction.

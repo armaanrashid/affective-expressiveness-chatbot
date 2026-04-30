@@ -1,11 +1,28 @@
 import os
+from datetime import datetime, timezone
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from openai import OpenAI
+import psycopg2
 
 app = Flask(__name__)
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+DATABASE_URL = os.getenv("DATABASE_URL")
+QUALTRICS_RETURN_URL = os.getenv("QUALTRICS_RETURN_URL", "")
+
 client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+
+MAX_TURNS = 5
+
+CONDITION_ID_MAP = {
+    "1": "Neutral",
+    "2": "Polite",
+    "3": "Supportive",
+    "4": "Warm",
+    "5": "Very Warm",
+    "6": "Over-Expressive",
+    "7": "Uncanny",
+}
 
 TONE_PROMPTS = {
     "Neutral": (
@@ -50,9 +67,44 @@ TONE_PROMPTS = {
 }
 
 
+def save_chat_message(participant_id, condition, role, message):
+    if not DATABASE_URL:
+        return
+
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        insert into chat_logs
+        (participant_id, condition, role, message, timestamp_utc)
+        values (%s, %s, %s, %s, %s)
+        """,
+        (
+            participant_id,
+            condition,
+            role,
+            message,
+            datetime.now(timezone.utc),
+        ),
+    )
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/config")
+def config():
+    return jsonify({
+        "max_turns": MAX_TURNS,
+        "qualtrics_return_url": QUALTRICS_RETURN_URL
+    })
 
 
 @app.route("/chat", methods=["POST"])
@@ -68,8 +120,15 @@ def chat():
         return jsonify({"error": "Invalid JSON payload."}), 400
 
     user_message = data.get("message", "").strip()
-    condition = data.get("condition", "Neutral").strip()
+cid = str(data.get("cid", "1")).strip()
+cid = str(data.get("cid", "")).strip()
+
+if cid not in CONDITION_ID_MAP:
+    return jsonify({"error": f"Invalid or missing cid: {cid}"}), 400
+
+condition = CONDITION_ID_MAP[cid]
     history = data.get("history", [])
+    participant_id = data.get("pid", "unknown")
 
     if not user_message:
         return jsonify({"error": "Message cannot be empty."}), 400
@@ -77,15 +136,28 @@ def chat():
     if condition not in TONE_PROMPTS:
         return jsonify({"error": f"Unknown condition: {condition}"}), 400
 
+    if not isinstance(history, list):
+        history = []
+
+    user_turns_so_far = sum(
+        1 for msg in history
+        if isinstance(msg, dict) and msg.get("role") == "user"
+    )
+
+    if user_turns_so_far >= MAX_TURNS:
+        return jsonify({
+            "reply": "Thank you. The conversation is now complete. Please return to the survey.",
+            "conversation_complete": True
+        })
+
     messages = [{"role": "system", "content": TONE_PROMPTS[condition]}]
 
-    if isinstance(history, list):
-        for msg in history:
-            if isinstance(msg, dict) and msg.get("role") in {"user", "assistant"}:
-                messages.append({
-                    "role": msg["role"],
-                    "content": msg.get("content", "")
-                })
+    for msg in history:
+        if isinstance(msg, dict) and msg.get("role") in {"user", "assistant"}:
+            messages.append({
+                "role": msg["role"],
+                "content": msg.get("content", "")
+            })
 
     messages.append({"role": "user", "content": user_message})
 
@@ -98,7 +170,16 @@ def chat():
         )
 
         reply = response.choices[0].message.content.strip()
-        return jsonify({"reply": reply})
+
+        save_chat_message(participant_id, condition, "user", user_message)
+        save_chat_message(participant_id, condition, "assistant", reply)
+
+        conversation_complete = user_turns_so_far + 1 >= MAX_TURNS
+
+        return jsonify({
+            "reply": reply,
+            "conversation_complete": conversation_complete
+        })
 
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
