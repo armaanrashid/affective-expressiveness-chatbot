@@ -40,6 +40,7 @@
 
         const cid = getParam("cid");
         const pid = getParam("pid") || "unknown";
+        const returnUrl = getParam("returnUrl");
 
         if (!cid) {
           document.body.innerHTML = `
@@ -63,6 +64,26 @@
           messageEl.textContent = content;
           chatWindow.appendChild(messageEl);
           chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        function redirectToSurvey() {
+          if (!returnUrl) {
+            appendMessage(
+              "assistant",
+              "The conversation is complete. Please return to the survey."
+            );
+            return;
+          }
+
+          const separator = returnUrl.includes("?") ? "&" : "?";
+
+          setTimeout(function () {
+            window.location.href =
+              returnUrl +
+              separator +
+              "pid=" + encodeURIComponent(pid) +
+              "&cid=" + encodeURIComponent(cid);
+          }, 2500);
         }
 
         chatForm.addEventListener("submit", function (e) {
@@ -96,15 +117,23 @@
               if (data.error) {
                 appendMessage("error", "Error: " + data.error);
                 history.pop();
-              } else {
-                const reply = data.reply;
-                appendMessage("assistant", reply);
-                history.push({ role: "assistant", content: reply });
+                return;
+              }
 
-                if (data.conversation_complete) {
-                  chatInput.disabled = true;
-                  chatInput.placeholder = "Conversation complete.";
-                }
+              const reply = data.reply;
+              appendMessage("assistant", reply);
+              history.push({ role: "assistant", content: reply });
+
+              if (data.conversation_complete) {
+                chatInput.disabled = true;
+                chatInput.placeholder = "Conversation complete.";
+
+                appendMessage(
+                  "assistant",
+                  "The conversation is complete. You will now return to the survey."
+                );
+
+                redirectToSurvey();
               }
             })
             .catch((err) => {
