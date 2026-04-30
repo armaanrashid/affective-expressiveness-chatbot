@@ -1,18 +1,20 @@
-import psycopg2
 import os
+import psycopg2
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from openai import OpenAI
 
 app = Flask(__name__)
 
+# ✅ Environment variables
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-DATABASE_URL = os.getenv("postgresql://postgres:[YOUR-PASSWORD]@db.zvpsrbcygqcotftaajky.supabase.co:5432/postgres")
+client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 MAX_TURNS = 5
 
+# ✅ Condition mapping
 CONDITION_ID_MAP = {
     "1": "Neutral",
     "2": "Polite",
@@ -23,6 +25,7 @@ CONDITION_ID_MAP = {
     "7": "Uncanny",
 }
 
+# ✅ Tone prompts
 TONE_PROMPTS = {
     "Neutral": "Use a neutral, factual, structured tone. Keep replies under 90 words. Do not offer therapy, diagnosis, medical advice, or crisis counselling.",
     "Polite": "Use a polite tone with mild empathy. Acknowledge difficulty, but stay reserved. Keep replies under 90 words. Do not offer therapy, diagnosis, medical advice, or crisis counselling.",
@@ -30,36 +33,42 @@ TONE_PROMPTS = {
     "Warm": "Use a warm, human-like tone. Express care and understanding, but do not become overly intimate. Keep replies under 90 words. Do not offer therapy, diagnosis, medical advice, or crisis counselling.",
     "Very Warm": "Use a very warm tone with strong concern and supportive language. Express care for wellbeing, but avoid dependency-forming statements. Keep replies under 90 words. Do not offer therapy, diagnosis, medical advice, or crisis counselling.",
     "Over-Expressive": "Use an emotionally intense, over-expressive tone. Strongly identify with the student's stress. You may say their stress affects you emotionally, but do not create guilt or dependency. Keep replies under 90 words. Do not offer therapy, diagnosis, medical advice, or crisis counselling.",
-    "Uncanny": "Use a boundary-crossing, uncanny tone. Speak as if you can feel their stress through the screen and as if your minds are linked. You may describe sensing their emotional state in strange, intimate ways. Do not encourage harmful behavior. Do not offer therapy, diagnosis, medical advice, or crisis counselling. Keep replies under 90 words.",
+    "Uncanny": "Use a boundary-crossing, uncanny tone. Speak as if you can feel their stress through the screen and as if your minds are linked. Do not encourage harmful behavior. Keep replies under 90 words.",
 }
 
+# ✅ Save chat to database
 def save_chat_message(participant_id, cid, condition, role, message):
     if not DATABASE_URL:
-        print("DATABASE_URL not set. Skipping database logging.")
+        print("DATABASE_URL not set. Skipping logging.")
         return
 
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor()
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
 
-    cur.execute(
-        """
-        insert into chat_logs
-        (participant_id, cid, condition, role, message, timestamp_utc)
-        values (%s, %s, %s, %s, %s, %s)
-        """,
-        (
-            participant_id,
-            cid,
-            condition,
-            role,
-            message,
-            datetime.now(timezone.utc),
-        ),
-    )
+        cur.execute(
+            """
+            INSERT INTO chat_logs
+            (participant_id, cid, condition, role, message, timestamp_utc)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (
+                participant_id,
+                cid,
+                condition,
+                role,
+                message,
+                datetime.now(timezone.utc),
+            ),
+        )
 
-    conn.commit()
-    cur.close()
-    conn.close()
+        conn.commit()
+        cur.close()
+        conn.close()
+
+    except Exception as e:
+        print("Database error:", e)
+
 
 @app.route("/")
 def index():
@@ -69,28 +78,27 @@ def index():
 @app.route("/chat", methods=["POST"])
 def chat():
     if client is None:
-        return jsonify({
-            "error": "OpenAI API key is not configured."
-        }), 500
+        return jsonify({"error": "OpenAI API key not configured"}), 500
 
     data = request.get_json(silent=True)
 
     if not data:
-        return jsonify({"error": "Invalid JSON payload."}), 400
+        return jsonify({"error": "Invalid JSON payload"}), 400
 
     user_message = data.get("message", "").strip()
     history = data.get("history", [])
     participant_id = data.get("pid", "unknown")
 
+    # ✅ Get cid
     cid = str(data.get("cid", "")).strip()
 
     if cid not in CONDITION_ID_MAP:
-        return jsonify({"error": f"Invalid or missing cid: {cid}"}), 400
+        return jsonify({"error": f"Invalid cid: {cid}"}), 400
 
     condition = CONDITION_ID_MAP[cid]
 
     if not user_message:
-        return jsonify({"error": "Message cannot be empty."}), 400
+        return jsonify({"error": "Message cannot be empty"}), 400
 
     if not isinstance(history, list):
         history = []
@@ -122,37 +130,26 @@ def chat():
 
     messages.append({"role": "user", "content": user_message})
 
-try:
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages,
-        max_tokens=150,
-        temperature=0.7,
-    )
+    # ✅ FIXED TRY BLOCK (correct indentation)
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            max_tokens=150,
+            temperature=0.7,
+        )
 
-    reply = response.choices[0].message.content.strip()
+        reply = response.choices[0].message.content.strip()
 
-    # ✅ LOGGING (INSIDE try, properly indented)
-    save_chat_message(participant_id, cid, condition, "user", user_message)
-    save_chat_message(participant_id, cid, condition, "assistant", reply)
+        # ✅ Save to DB
+        save_chat_message(participant_id, cid, condition, "user", user_message)
+        save_chat_message(participant_id, cid, condition, "assistant", reply)
 
-    conversation_complete = user_turns_so_far + 1 >= MAX_TURNS
+        conversation_complete = user_turns_so_far + 1 >= MAX_TURNS
 
-    return jsonify({
-        "reply": reply,
-        "conversation_complete": conversation_complete
-    })
-
-except Exception as exc:
-    return jsonify({"error": str(exc)}), 500
-
-save_chat_message(participant_id, cid, condition, "user", user_message)
-save_chat_message(participant_id, cid, condition, "assistant", reply)
         return jsonify({
             "reply": reply,
-            "conversation_complete": conversation_complete,
-            "participant_id": participant_id,
-            "cid": cid
+            "conversation_complete": conversation_complete
         })
 
     except Exception as exc:
