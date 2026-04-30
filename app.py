@@ -1,3 +1,4 @@
+import psycopg2
 import os
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify, render_template, send_from_directory
@@ -7,6 +8,8 @@ app = Flask(__name__)
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+
+DATABASE_URL = os.getenv("postgresql://postgres:[YOUR-PASSWORD]@db.zvpsrbcygqcotftaajky.supabase.co:5432/postgres")
 
 MAX_TURNS = 5
 
@@ -30,6 +33,33 @@ TONE_PROMPTS = {
     "Uncanny": "Use a boundary-crossing, uncanny tone. Speak as if you can feel their stress through the screen and as if your minds are linked. You may describe sensing their emotional state in strange, intimate ways. Do not encourage harmful behavior. Do not offer therapy, diagnosis, medical advice, or crisis counselling. Keep replies under 90 words.",
 }
 
+def save_chat_message(participant_id, cid, condition, role, message):
+    if not DATABASE_URL:
+        print("DATABASE_URL not set. Skipping database logging.")
+        return
+
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        insert into chat_logs
+        (participant_id, cid, condition, role, message, timestamp_utc)
+        values (%s, %s, %s, %s, %s, %s)
+        """,
+        (
+            participant_id,
+            cid,
+            condition,
+            role,
+            message,
+            datetime.now(timezone.utc),
+        ),
+    )
+
+    conn.commit()
+    cur.close()
+    conn.close()
 
 @app.route("/")
 def index():
@@ -102,7 +132,9 @@ def chat():
 
         reply = response.choices[0].message.content.strip()
         conversation_complete = user_turns_so_far + 1 >= MAX_TURNS
-
+        
+save_chat_message(participant_id, cid, condition, "user", user_message)
+save_chat_message(participant_id, cid, condition, "assistant", reply)
         return jsonify({
             "reply": reply,
             "conversation_complete": conversation_complete,
