@@ -3,30 +3,23 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Affective Expressiveness Chatbot</title>
+    <title>AI Interaction Task</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
+
   <body>
     <header class="header">
       <h1>AI Interaction Task</h1>
       <p>
-        The conversation will last for a few exchanges (approximately 5 messages). After that, you will return to the survey.
+        You will interact with an AI partner designed to respond to your messages in a conversational manner.
+        Please engage naturally. The conversation will last for approximately 5 messages.
+        After that, you will return to the survey.
       </p>
     </header>
+
     <main>
-<div class="controls" style="display: none;">
-        <label for="condition-select">Condition:</label>
-        <select id="condition-select">
-          <option value="Neutral">Neutral</option>
-          <option value="Polite">Polite</option>
-          <option value="Supportive">Supportive</option>
-          <option value="Warm">Warm</option>
-          <option value="Very Warm">Very Warm</option>
-          <option value="Over-Expressive">Over-Expressive</option>
-          <option value="Uncanny">Uncanny</option>
-        </select>
-      </div>
       <div id="chat-window" class="chat-window"></div>
+
       <form id="chat-form" class="chat-form" autocomplete="off">
         <input
           id="chat-input"
@@ -37,76 +30,60 @@
         <button type="submit">Send</button>
       </form>
     </main>
+
     <script>
       (function () {
-        // Parse URL parameters into a dictionary
-        function getParams() {
-          const params = {};
-          const query = window.location.search.substring(1);
-          const vars = query.split("&");
-          for (const v of vars) {
-            const pair = v.split("=");
-            if (pair.length === 2) {
-              params[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1]);
-            }
-          }
-          return params;
+        function getParam(name) {
+          const url = new URL(window.location.href);
+          return url.searchParams.get(name);
         }
 
-        // Initialize condition from URL parameter if available
-        const params = getParams();
-        const conditionSelect = document.getElementById("condition-select");
-        if (params["condition"] && conditionSelect) {
-          const cond = params["condition"];
-          for (const opt of conditionSelect.options) {
-            if (opt.value === cond) {
-              conditionSelect.value = cond;
-              break;
-            }
-          }
+        const cid = getParam("cid");
+        const pid = getParam("pid") || "unknown";
+
+        if (!cid) {
+          document.body.innerHTML = `
+            <main style="max-width: 700px; margin: 60px auto; font-family: Arial, sans-serif;">
+              <h2>Invalid Access</h2>
+              <p>This AI interaction must be accessed through the survey link.</p>
+            </main>
+          `;
+          return;
         }
 
         const chatWindow = document.getElementById("chat-window");
         const chatForm = document.getElementById("chat-form");
         const chatInput = document.getElementById("chat-input");
 
-        // Conversation history (client-side only)
         let history = [];
 
-        // Append a message to the chat window
         function appendMessage(role, content) {
           const messageEl = document.createElement("div");
           messageEl.classList.add("message", role);
           messageEl.textContent = content;
           chatWindow.appendChild(messageEl);
-          // Scroll to bottom
           chatWindow.scrollTop = chatWindow.scrollHeight;
         }
 
-        // Handle form submission
         chatForm.addEventListener("submit", function (e) {
           e.preventDefault();
+
           const userMessage = chatInput.value.trim();
           if (!userMessage) return;
+
           appendMessage("user", userMessage);
-          // Add to history before sending to server
           history.push({ role: "user", content: userMessage });
+
           chatInput.value = "";
           chatInput.focus();
-          // Prepare payload
-function getParam(name) {
-    const url = new URL(window.location.href);
-    return url.searchParams.get(name);
-}
 
-const pid = getParam("pid") || "test_user";
+          const payload = {
+            message: userMessage,
+            cid: cid,
+            pid: pid,
+            history: history.slice(0, history.length - 1)
+          };
 
-const payload = {
-    message: userMessage,
-    condition: conditionSelect.value,
-    history: history.slice(0, history.length - 1),
-    pid: pid
-};
           fetch("/chat", {
             method: "POST",
             headers: {
@@ -118,12 +95,16 @@ const payload = {
             .then((data) => {
               if (data.error) {
                 appendMessage("error", "Error: " + data.error);
-                // Remove the user message from history since no reply
                 history.pop();
               } else {
                 const reply = data.reply;
                 appendMessage("assistant", reply);
                 history.push({ role: "assistant", content: reply });
+
+                if (data.conversation_complete) {
+                  chatInput.disabled = true;
+                  chatInput.placeholder = "Conversation complete.";
+                }
               }
             })
             .catch((err) => {
