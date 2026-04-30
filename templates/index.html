@@ -16,7 +16,7 @@
       </p>
     </header>
     <main>
-      <div class="controls">
+<div class="controls" style="display: none;">
         <label for="condition-select">Condition:</label>
         <select id="condition-select">
           <option value="Neutral">Neutral</option>
@@ -96,11 +96,19 @@
           chatInput.value = "";
           chatInput.focus();
           // Prepare payload
-          const payload = {
-            message: userMessage,
-            condition: conditionSelect.value,
-            history: history.slice(0, history.length - 1) // exclude latest; server will append
-          };
+function getParam(name) {
+    const url = new URL(window.location.href);
+    return url.searchParams.get(name);
+}
+
+const pid = getParam("pid") || "test_user";
+
+const payload = {
+    message: userMessage,
+    condition: conditionSelect.value,
+    history: history.slice(0, history.length - 1),
+    pid: pid
+};
           fetch("/chat", {
             method: "POST",
             headers: {
