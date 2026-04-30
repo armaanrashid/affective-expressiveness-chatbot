@@ -122,17 +122,30 @@ def chat():
 
     messages.append({"role": "user", "content": user_message})
 
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            max_tokens=150,
-            temperature=0.7,
-        )
+try:
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=messages,
+        max_tokens=150,
+        temperature=0.7,
+    )
 
-        reply = response.choices[0].message.content.strip()
-        conversation_complete = user_turns_so_far + 1 >= MAX_TURNS
-        
+    reply = response.choices[0].message.content.strip()
+
+    # ✅ LOGGING (INSIDE try, properly indented)
+    save_chat_message(participant_id, cid, condition, "user", user_message)
+    save_chat_message(participant_id, cid, condition, "assistant", reply)
+
+    conversation_complete = user_turns_so_far + 1 >= MAX_TURNS
+
+    return jsonify({
+        "reply": reply,
+        "conversation_complete": conversation_complete
+    })
+
+except Exception as exc:
+    return jsonify({"error": str(exc)}), 500
+
 save_chat_message(participant_id, cid, condition, "user", user_message)
 save_chat_message(participant_id, cid, condition, "assistant", reply)
         return jsonify({
