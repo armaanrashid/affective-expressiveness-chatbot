@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Affective Expressiveness Chatbot</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="header">
+      <h1>Affective Expressiveness Chatbot</h1>
+      <p>
+        Select an affective expressiveness condition and start chatting.  A
+        conversation history is not stored on the server; it is maintained
+        client‑side.
+      </p>
+    </header>
+    <main>
+      <div class="controls">
+        <label for="condition-select">Condition:</label>
+        <select id="condition-select">
+          <option value="Neutral">Neutral</option>
+          <option value="Polite">Polite</option>
+          <option value="Supportive">Supportive</option>
+          <option value="Warm">Warm</option>
+          <option value="Very Warm">Very Warm</option>
+          <option value="Over-Expressive">Over-Expressive</option>
+          <option value="Uncanny">Uncanny</option>
+        </select>
+      </div>
+      <div id="chat-window" class="chat-window"></div>
+      <form id="chat-form" class="chat-form" autocomplete="off">
+        <input
+          id="chat-input"
+          type="text"
+          placeholder="Type your message..."
+          required
+        />
+        <button type="submit">Send</button>
+      </form>
+    </main>
+    <script>
+      (function () {
+        // Parse URL parameters into a dictionary
+        function getParams() {
+          const params = {};
+          const query = window.location.search.substring(1);
+          const vars = query.split("&");
+          for (const v of vars) {
+            const pair = v.split("=");
+            if (pair.length === 2) {
+              params[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1]);
+            }
+          }
+          return params;
+        }
+
+        // Initialize condition from URL parameter if available
+        const params = getParams();
+        const conditionSelect = document.getElementById("condition-select");
+        if (params["condition"] && conditionSelect) {
+          const cond = params["condition"];
+          for (const opt of conditionSelect.options) {
+            if (opt.value === cond) {
+              conditionSelect.value = cond;
+              break;
+            }
+          }
+        }
+
+        const chatWindow = document.getElementById("chat-window");
+        const chatForm = document.getElementById("chat-form");
+        const chatInput = document.getElementById("chat-input");
+
+        // Conversation history (client-side only)
+        let history = [];
+
+        // Append a message to the chat window
+        function appendMessage(role, content) {
+          const messageEl = document.createElement("div");
+          messageEl.classList.add("message", role);
+          messageEl.textContent = content;
+          chatWindow.appendChild(messageEl);
+          // Scroll to bottom
+          chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        // Handle form submission
+        chatForm.addEventListener("submit", function (e) {
+          e.preventDefault();
+          const userMessage = chatInput.value.trim();
+          if (!userMessage) return;
+          appendMessage("user", userMessage);
+          // Add to history before sending to server
+          history.push({ role: "user", content: userMessage });
+          chatInput.value = "";
+          chatInput.focus();
+          // Prepare payload
+          const payload = {
+            message: userMessage,
+            condition: conditionSelect.value,
+            history: history.slice(0, history.length - 1) // exclude latest; server will append
+          };
+          fetch("/chat", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+          })
+            .then((resp) => resp.json())
+            .then((data) => {
+              if (data.error) {
+                appendMessage("error", "Error: " + data.error);
+                // Remove the user message from history since no reply
+                history.pop();
+              } else {
+                const reply = data.reply;
+                appendMessage("assistant", reply);
+                history.push({ role: "assistant", content: reply });
+              }
+            })
+            .catch((err) => {
+              appendMessage("error", "Network error: " + err.message);
+              history.pop();
+            });
+        });
+      })();
+    </script>
+  </body>
+</html>

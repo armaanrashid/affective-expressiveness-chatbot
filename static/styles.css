@@ -1,0 +1,111 @@
+/* Basic styles for the chat interface */
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #f8f9fa;
+  color: #333;
+}
+
+.header {
+  background: #415a77;
+  color: #fff;
+  padding: 1rem 2rem;
+  text-align: center;
+}
+
+.header h1 {
+  margin: 0.2rem 0;
+  font-size: 1.5rem;
+}
+
+.header p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+main {
+  max-width: 600px;
+  margin: 1.5rem auto;
+  padding: 0 1rem;
+}
+
+.controls {
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.controls label {
+  font-weight: bold;
+}
+
+#condition-select {
+  padding: 0.25rem 0.5rem;
+  font-size: 1rem;
+}
+
+.chat-window {
+  border: 1px solid #ccc;
+  background: #fff;
+  height: 350px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+
+.message {
+  margin: 0.25rem 0;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  max-width: 90%;
+  word-wrap: break-word;
+  line-height: 1.3;
+}
+
+.message.user {
+  background: #d1e9ff;
+  align-self: flex-end;
+  margin-left: auto;
+}
+
+.message.assistant {
+  background: #e8f5e9;
+  align-self: flex-start;
+  margin-right: auto;
+}
+
+.message.error {
+  background: #fcebea;
+  color: #d93025;
+  font-style: italic;
+}
+
+.chat-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.chat-form input[type="text"] {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.chat-form button {
+  padding: 0.4rem 0.8rem;
+  font-size: 1rem;
+  background: #415a77;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.chat-form button:hover {
+  background: #2d3e5f;
+}
