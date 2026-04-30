@@ -38,19 +38,9 @@
           return url.searchParams.get(name);
         }
 
-        const cid = getParam("cid");
-        const pid = getParam("pid") || "unknown";
+        const cid = getParam("cid") || "1";   // defaults to Neutral for direct/demo access
+        const pid = getParam("pid") || "demo_user";
         const returnUrl = getParam("returnUrl");
-
-        if (!cid) {
-          document.body.innerHTML = `
-            <main style="max-width: 700px; margin: 60px auto; font-family: Arial, sans-serif;">
-              <h2>Invalid Access</h2>
-              <p>This AI interaction must be accessed through the survey link.</p>
-            </main>
-          `;
-          return;
-        }
 
         const chatWindow = document.getElementById("chat-window");
         const chatForm = document.getElementById("chat-form");
